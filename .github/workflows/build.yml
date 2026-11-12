@@ -49,7 +49,7 @@ jobs:
           chmod +x ~/godot/godot
           ~/godot/godot --headless --import || true
 
-      - name: Oyun testi (her bölüm: navmesh, devriye, görülme, bıçak, görev)
+      - name: "Oyun testi (her bölüm - navmesh, devriye, görülme, bıçak, görev)"
         run: |
           for i in 0 1 2 3 4 5 6; do
             ~/godot/godot --headless -s res://tests/sim.gd -- --test-level=res://levels/bolum$i.json 2>&1 | grep -v 'Parameter "m"\|mesh_storage.h' | tee -a test.log
