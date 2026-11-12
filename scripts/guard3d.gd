@@ -10,6 +10,7 @@ extends CharacterBody3D
 ## comelen oyuncu gercekten gorunmez.
 
 const LV := preload("res://scripts/level3d.gd")
+const SoldierModel := preload("res://scripts/soldier_model.gd")
 
 const EYE := 1.62
 const VIEW_RANGE := 24.0         # metre (er)
@@ -82,14 +83,12 @@ var _far_t := 0.0
 var _stuck_t := 0.0
 var _last_pos := Vector3.ZERO
 
-var model: Node3D
+var model
 var _label: Label3D
 var _cone_mi: MeshInstance3D
 var _imesh: ImmediateMesh
 var _cone_mat: StandardMaterial3D
-var _muzzle: OmniLight3D
-var _walk_ph := 0.0
-var _legs: Array = []
+var _anim_far := false
 
 
 func _stat(i: int) -> float:
@@ -146,53 +145,9 @@ func _box(sz: Vector3, pos: Vector3, c: Color, parent: Node3D) -> MeshInstance3D
 
 
 func _build_model() -> void:
-	model = Node3D.new()
+	model = SoldierModel.new()
+	model.outfit = kind
 	add_child(model)
-	var uc: Color = COLORS.get(kind, COLORS["er"])
-	var boots := Color(0.12, 0.1, 0.08)
-	for s in [-1, 1]:
-		var leg := Node3D.new()
-		leg.position = Vector3(s * 0.13, 0.9, 0)
-		model.add_child(leg)
-		_box(Vector3(0.18, 0.75, 0.2), Vector3(0, -0.4, 0), uc.darkened(0.15), leg)
-		_box(Vector3(0.2, 0.15, 0.3), Vector3(0, -0.82, -0.04), boots, leg)
-		_legs.append(leg)
-	_box(Vector3(0.5, 0.62, 0.3), Vector3(0, 1.22, 0), uc, model)
-	_box(Vector3(0.52, 0.08, 0.32), Vector3(0, 0.95, 0), Color(0.2, 0.16, 0.1), model)   # kemer
-	for s in [-1, 1]:
-		_box(Vector3(0.14, 0.6, 0.16), Vector3(s * 0.32, 1.2, -0.05), uc.darkened(0.05), model)
-	var head := MeshInstance3D.new()
-	var sm := SphereMesh.new()
-	sm.radius = 0.13
-	sm.height = 0.27
-	head.mesh = sm
-	var skin := StandardMaterial3D.new()
-	skin.albedo_color = Color(0.85, 0.68, 0.55)
-	head.material_override = skin
-	head.position = Vector3(0, 1.66, 0)
-	model.add_child(head)
-	if kind == "subay":
-		_box(Vector3(0.3, 0.08, 0.32), Vector3(0, 1.8, -0.02), uc.darkened(0.3), model)   # kasket
-		_box(Vector3(0.24, 0.1, 0.24), Vector3(0, 1.86, 0), uc.darkened(0.3), model)
-	else:
-		var hel := MeshInstance3D.new()
-		var hs := SphereMesh.new()
-		hs.radius = 0.17
-		hs.height = 0.22
-		hel.mesh = hs
-		var hm := StandardMaterial3D.new()
-		hm.albedo_color = (Color(0.9, 0.9, 0.92) if kind == "kis" else Color(0.25, 0.28, 0.22))
-		hel.material_override = hm
-		hel.position = Vector3(0, 1.75, 0)
-		model.add_child(hel)
-	# tufek (namlu -z yonunde)
-	_box(Vector3(0.06, 0.08, 0.9), Vector3(0.22, 1.25, -0.35), Color(0.22, 0.15, 0.09), model)
-	_muzzle = OmniLight3D.new()
-	_muzzle.light_color = Color(1, 0.8, 0.4)
-	_muzzle.omni_range = 4.0
-	_muzzle.light_energy = 0.0
-	_muzzle.position = Vector3(0.22, 1.27, -0.85)
-	model.add_child(_muzzle)
 	_label = Label3D.new()
 	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	_label.no_depth_test = true
@@ -282,19 +237,29 @@ func _physics_process(delta: float) -> void:
 	_update_label()
 
 
-func _animate(delta: float) -> void:
+func _animate(_delta: float) -> void:
+	## 3D modelin hareketi: durum + hiz -> animasyon
+	var far: bool = main.far_from_player(global_position)
+	if far != _anim_far:
+		_anim_far = far
+		model.set_active(not far)
+	if far:
+		return
 	var hv := Vector2(velocity.x, velocity.z).length()
-	if hv > 0.2:
-		_walk_ph += delta * hv * 4.2
-		var sw := sin(_walk_ph) * 0.55
-		_legs[0].rotation.x = sw
-		_legs[1].rotation.x = -sw
-		model.position.y = absf(cos(_walk_ph)) * 0.04
+	var armed: bool = state == &"combat" or state == &"alarm_run" or (main.alert_level >= 2 and state != &"patrol")
+	model.weapon_ready(armed)
+	if hv > 3.0:
+		model.play("Sprint", hv / 5.5)
+	elif hv > 2.0:
+		model.play("Jog_Fwd", hv / 3.2)
+	elif hv > 0.15:
+		model.play("Walk", hv / 1.45)
+	elif state == &"combat":
+		model.play("Pistol_Aim_Neutral")
+	elif armed:
+		model.play("Pistol_Idle")
 	else:
-		_legs[0].rotation.x = lerpf(_legs[0].rotation.x, 0.0, delta * 8.0)
-		_legs[1].rotation.x = lerpf(_legs[1].rotation.x, 0.0, delta * 8.0)
-	if _muzzle.light_energy > 0.0:
-		_muzzle.light_energy = maxf(0.0, _muzzle.light_energy - delta * 40.0)
+		model.play("Idle")
 
 
 func _update_label() -> void:
@@ -450,7 +415,7 @@ func _shoot(tgt, dist: float) -> void:
 	if Vector2(tv.x, tv.z).length() > 3.0:
 		acc *= 0.75
 	var hit := randf() < acc
-	_muzzle.light_energy = 3.0
+	model.fire()
 	main.gunshot_fx(eye() + dir_vec(facing) * 0.7, tgt.aim_point() + (Vector3.ZERO if hit else Vector3(randf_range(-1.5, 1.5), randf_range(-0.6, 1.0), randf_range(-1.5, 1.5))))
 	main.make_noise(global_position, 30.0, self)
 	if hit:
@@ -617,8 +582,7 @@ func _wake_up() -> void:
 	discovered = false
 	hidden_body = false
 	collision_layer = LV.L_GUARD
-	model.rotation = Vector3.ZERO
-	model.position = Vector3.ZERO
+	model.revive()
 	vigilant_t = VIGIL_TIME * 2.0
 	suspicion = 0.6
 	investigate_pos = global_position
@@ -634,6 +598,7 @@ func take_damage(amount: float, from: Vector3) -> void:
 	if hp <= 0.0:
 		kill()
 		return
+	model.hit()
 	var shooter = main.player
 	if shooter != null and shooter.alive:
 		enter_combat(shooter)
@@ -783,9 +748,7 @@ func kill() -> void:
 	_label.text = ""
 	clear_cone()
 	collision_layer = 0
-	# yere yat
-	model.rotation.x = PI / 2
-	model.position = Vector3(0, 0.16, 0)
+	model.die()
 
 
 func status_text() -> String:

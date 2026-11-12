@@ -55,3 +55,12 @@ xvfb-run godot --rendering-driver opengl3 -s res://tests/shot.gd -- --test-level
 - Kayıt ve yükleme (çoklu kayıt yeri, ölünce yeniden yükleme)
 - Dikenli tel kesme, projektörler, el bombası, ayak izi takibi (Komando'da var, burada henüz yok)
 - Ses efektleri
+
+## 3D modeller (lisans: CC0 ve CC-BY)
+- `assets/models/ual.glb`: Quaternius Universal Animation Library (CC0). İnsan iskeleti, mesh ve 45 hareketten oluşuyor: yürüme, koşu, çömelme, tabanca nişan ve ateş, şarjör, vurulma, ölüm, tamir.
+- `scripts/soldier_model.gd` askerin görünüşünü oyun çalışırken kurar:
+  - Kıyafet: gölgelendirici her kemiği bir parçaya göre boyar (ceket, pantolon, çizme, ten). Komando'daki asker2.py ile aynı mantık.
+  - Teçhizat: Stahlhelm ya da subay kasketi, sırt çantası, kemer, matara, sırtta tüfek, elde MP40.
+  - Rütbe kıyafetleri: er (feldgrau), kış (beyaz), SS (koyu), subay (kasket, tabanca). Dost karakterler: komando, direnişçi, pilot.
+- Asker devriyede yürür ve tüfeği sırtındadır. Alarmda silahını çeker ve koşar. Çatışmada nişan alır, ateş eder (namlu alevi ile), vurulunca sarsılır, ölünce yere düşer.
+- Oyuncudan 70 metreden uzaktaki askerlerin animasyonu durur (telefon performansı için).

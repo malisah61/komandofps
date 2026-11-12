@@ -3,6 +3,7 @@ extends CharacterBody3D
 ## Askerler izleyen dostu da gorebilir (Komando'daki gibi): gorulurse catisma baslar.
 
 const LV := preload("res://scripts/level3d.gd")
+const SoldierModel := preload("res://scripts/soldier_model.gd")
 const OUTFITS := {
 	"direnisci": Color(0.35, 0.3, 0.25), "pilot": Color(0.45, 0.36, 0.22), "komando": Color(0.3, 0.36, 0.22),
 	"alman_subay": Color(0.48, 0.5, 0.44),
@@ -19,7 +20,7 @@ var hp := 80.0
 var nav_agent: NavigationAgent3D
 var _repath := 0.0
 var _crouch := false
-var _body: Node3D
+var _body
 
 
 func _ready() -> void:
@@ -38,28 +39,9 @@ func _ready() -> void:
 	nav_agent.target_desired_distance = 1.6
 	nav_agent.radius = 0.4
 	add_child(nav_agent)
-	_body = Node3D.new()
+	_body = SoldierModel.new()
+	_body.outfit = outfit
 	add_child(_body)
-	var c: Color = OUTFITS.get(outfit, Color(0.4, 0.35, 0.3))
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.5, 1.3, 0.3)
-	var mi := MeshInstance3D.new()
-	mi.mesh = bm
-	var m := StandardMaterial3D.new()
-	m.albedo_color = c
-	mi.material_override = m
-	mi.position.y = 0.85
-	_body.add_child(mi)
-	var hm := SphereMesh.new()
-	hm.radius = 0.13
-	hm.height = 0.27
-	var hi := MeshInstance3D.new()
-	hi.mesh = hm
-	var sk := StandardMaterial3D.new()
-	sk.albedo_color = Color(0.85, 0.68, 0.55)
-	hi.material_override = sk
-	hi.position.y = 1.65
-	_body.add_child(hi)
 	var lab := Label3D.new()
 	lab.text = display_name
 	lab.font_size = 36
@@ -98,13 +80,15 @@ func take_damage(amount: float, _from: Vector3) -> void:
 	hp -= amount
 	if hp <= 0.0:
 		alive = false
-		_body.rotation.x = PI / 2
+		_body.die()
 		main.lose(display_name + " öldü")
 
 
 func _physics_process(delta: float) -> void:
 	if not alive or not following or main.game_over:
 		velocity = Vector3.ZERO
+		if alive and not following:
+			_body.play("Sitting_Idle" if outfit == "pilot" or outfit == "komando" else "Idle")
 		return
 	var p = main.player
 	_crouch = p.is_crouching()
@@ -124,5 +108,13 @@ func _physics_process(delta: float) -> void:
 		velocity.x = 0
 		velocity.z = 0
 	velocity.y = -0.5 if is_on_floor() else velocity.y - 18.0 * delta
-	_body.scale.y = lerpf(_body.scale.y, 0.65 if _crouch else 1.0, minf(1.0, delta * 8.0))
+	var hv := Vector2(velocity.x, velocity.z).length()
+	if _crouch:
+		_body.play("Crouch_Fwd" if hv > 0.2 else "Crouch_Idle", maxf(hv / 1.4, 0.6))
+	elif hv > 3.5:
+		_body.play("Sprint", hv / 5.5)
+	elif hv > 0.2:
+		_body.play("Walk", hv / 1.45)
+	else:
+		_body.play("Idle")
 	move_and_slide()
